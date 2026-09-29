@@ -1,0 +1,43 @@
+{
+    {$SERVER_NAME:localhost} {
+        root * /app/public
+        index index.php
+
+        # Compression
+        encode zstd br gzip
+
+        # Sécurité
+        header {
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            X-Content-Type-Options "nosniff"
+            X-Frame-Options "SAMEORIGIN"
+            Referrer-Policy "strict-origin-when-cross-origin"
+            -Server
+        }
+
+        # Assets publics mis en cache longuement
+        @assets path /build/* /storage/* /favicon.ico /robots.txt
+        header @assets Cache-Control "public, max-age=31536000, immutable"
+
+        # Bloque l'accès aux fichiers sensibles
+        @denied path /.env* /database/* /storage/*.key /.git/*
+        respond @denied 404
+
+        # Fichiers publics existants servis en statique
+        @existing file
+        handle @existing {
+            file_server
+        }
+
+        # Tout le reste passe par FrankenPHP
+        handle {
+            frankenphp
+        }
+
+        # Logs
+        log {
+            output stderr
+            format console
+        }
+    }
+}

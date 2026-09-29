@@ -1,0 +1,44 @@
+# Git / IDE
+.git
+.gitattributes
+.gitignore
+.github
+.idea
+.vscode
+.claude
+.claude/**
+AGENTS.md
+CLAUDE.md
+README.md
+
+# Dépendances (reconstruites dans l'image)
+node_modules
+vendor
+package-lock.json
+
+# Secrets & env local (généré / injecté pendant le build)
+.env
+.env.*
+!.env.example
+auth.json
+
+# Local dev
+.phpunit.result.cache
+.php-cs-fixer.cache
+bun.lockb
+*.log
+serve.log
+capture_screenshots.cjs
+
+# Base locale
+database/database.sqlite
+
+# Artefacts
+public/build
+public/hot
+Dockerfile
+docker-compose*.yml
+compose*.yaml
+compose*.yml
+README.md
+Makefile
