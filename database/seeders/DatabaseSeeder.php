@@ -21,10 +21,10 @@ class DatabaseSeeder extends Seeder
     {
         // 1. Create Super Admin & Admin Users
         $superAdmin = User::firstOrCreate(
-            ['email' => 'admin@whatsapp-store.com'],
+            ['email' => 'admin@joboy.shop'],
             [
                 'name' => 'Super Admin',
-                'phone' => '+33600000001',
+                'phone' => '+832529100',
                 'role' => 'super_admin',
                 'password' => Hash::make('password123'),
             ]
@@ -99,9 +99,9 @@ class DatabaseSeeder extends Seeder
         }
 
         // 3. Settings Defaults
-        Setting::set('store_name', 'Boutique WhatsApp Pro');
-        Setting::set('store_whatsapp_phone', '33612345678');
-        Setting::set('currency_symbol', '€');
+        Setting::set('store_name', 'Joboy Boutique');
+        Setting::set('store_whatsapp_phone', '243832529100');
+        Setting::set('currency_symbol', '$');
         Setting::set('whatsapp_driver', 'log'); // 'none', 'log', 'whatsapp_cloud_api', 'twilio', 'infobip'
         Setting::set('whatsapp_cloud_api_token', '');
         Setting::set('whatsapp_cloud_api_phone_number_id', '');
