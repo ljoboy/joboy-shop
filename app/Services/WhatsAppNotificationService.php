@@ -86,6 +86,9 @@ class WhatsAppNotificationService
             case 'twilio':
                 return $this->sendViaTwilio($customerPhone, $message);
 
+            case 'infobip':
+                return $this->sendViaInfoBip($customerPhone, $message);
+
             default:
                 return false;
         }
@@ -141,6 +144,36 @@ class WhatsAppNotificationService
             return $response->successful();
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error("Twilio WhatsApp error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    protected function sendViaInfoBip(string $phone, string $message): bool
+    {
+        $apiKey = Setting::get('infobip_api_key');
+        $from = Setting::get('infobip_from_phone');
+        $baseUrl = rtrim((string) Setting::get('infobip_base_url', 'https://api.infobip.com'), '/');
+
+        if (!$apiKey || !$from) {
+            \Illuminate\Support\Facades\Log::warning("InfoBip WhatsApp credentials missing.");
+            return false;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'App ' . $apiKey,
+            ])->post("{$baseUrl}/whatsapp/1/message/text", [
+                'from' => $from,
+                'to' => $phone,
+                'messageId' => (string) \Illuminate\Support\Str::uuid(),
+                'content' => [
+                    'text' => $message,
+                ],
+            ]);
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("InfoBip WhatsApp error: " . $e->getMessage());
             return false;
         }
     }

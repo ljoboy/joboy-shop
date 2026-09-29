@@ -65,6 +65,9 @@ class AdminController extends Controller
             'twilio_account_sid' => Setting::get('twilio_account_sid', ''),
             'twilio_auth_token' => Setting::get('twilio_auth_token', ''),
             'twilio_from_phone' => Setting::get('twilio_from_phone', ''),
+            'infobip_api_key' => Setting::get('infobip_api_key', ''),
+            'infobip_base_url' => Setting::get('infobip_base_url', ''),
+            'infobip_from_phone' => Setting::get('infobip_from_phone', ''),
         ];
 
         return view('admin.settings', compact('settings'));
@@ -75,12 +78,15 @@ class AdminController extends Controller
         $data = $request->validate([
             'store_name' => 'required|string|max:255',
             'store_whatsapp_phone' => 'required|string|max:50',
-            'whatsapp_driver' => 'required|in:none,log,whatsapp_cloud_api,twilio',
+            'whatsapp_driver' => 'required|in:none,log,whatsapp_cloud_api,twilio,infobip',
             'whatsapp_cloud_api_token' => 'nullable|string',
             'whatsapp_cloud_api_phone_number_id' => 'nullable|string',
             'twilio_account_sid' => 'nullable|string',
             'twilio_auth_token' => 'nullable|string',
             'twilio_from_phone' => 'nullable|string',
+            'infobip_api_key' => 'nullable|string',
+            'infobip_base_url' => 'nullable|string',
+            'infobip_from_phone' => 'nullable|string',
         ]);
 
         foreach ($data as $key => $value) {

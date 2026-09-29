@@ -38,7 +38,7 @@
 
             <div>
                 <label class="block text-sm font-bold text-gray-700 mb-2">Choisir le Moteur d'envoi *</label>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                     <label :class="{ 'border-emerald-600 bg-emerald-50/50': driver === 'log' }" class="p-4 border-2 rounded-2xl cursor-pointer transition flex flex-col items-center text-center">
                         <input type="radio" name="whatsapp_driver" value="log" x-model="driver" class="sr-only">
                         <i class="fa-solid fa-file-lines text-2xl text-amber-500 mb-2"></i>
@@ -58,6 +58,13 @@
                         <i class="fa-solid fa-comments text-2xl text-red-500 mb-2"></i>
                         <span class="font-bold text-sm text-gray-900">Twilio API</span>
                         <span class="text-xs text-gray-500 mt-1">Passerelle API Twilio WhatsApp</span>
+                    </label>
+
+                    <label :class="{ 'border-emerald-600 bg-emerald-50/50': driver === 'infobip' }" class="p-4 border-2 rounded-2xl cursor-pointer transition flex flex-col items-center text-center">
+                        <input type="radio" name="whatsapp_driver" value="infobip" x-model="driver" class="sr-only">
+                        <i class="fa-solid fa-comments text-2xl text-purple-600 mb-2"></i>
+                        <span class="font-bold text-sm text-gray-900">InfoBip API</span>
+                        <span class="text-xs text-gray-500 mt-1">Passerelle API InfoBip WhatsApp</span>
                     </label>
 
                     <label :class="{ 'border-emerald-600 bg-emerald-50/50': driver === 'none' }" class="p-4 border-2 rounded-2xl cursor-pointer transition flex flex-col items-center text-center">
@@ -96,6 +103,23 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Twilio WhatsApp From Number (Ex: +14155238886)</label>
                     <input type="text" name="twilio_from_phone" value="{{ old('twilio_from_phone', $settings['twilio_from_phone']) }}" class="w-full rounded-xl border-gray-300 border p-2.5 text-xs font-mono">
+                </div>
+            </div>
+
+            <!-- InfoBip Credentials -->
+            <div x-show="driver === 'infobip'" class="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-4">
+                <h3 class="font-bold text-gray-900 text-sm">Identifiants InfoBip WhatsApp</h3>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">API Key</label>
+                    <input type="password" name="infobip_api_key" value="{{ old('infobip_api_key', $settings['infobip_api_key']) }}" class="w-full rounded-xl border-gray-300 border p-2.5 text-xs font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Base URL (Ex: https://api.infobip.com, laisser vide pour défaut)</label>
+                    <input type="text" name="infobip_base_url" value="{{ old('infobip_base_url', $settings['infobip_base_url']) }}" class="w-full rounded-xl border-gray-300 border p-2.5 text-xs font-mono" placeholder="https://api.infobip.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">InfoBip WhatsApp From Number (format international sans le +)</label>
+                    <input type="text" name="infobip_from_phone" value="{{ old('infobip_from_phone', $settings['infobip_from_phone']) }}" class="w-full rounded-xl border-gray-300 border p-2.5 text-xs font-mono">
                 </div>
             </div>
         </div>

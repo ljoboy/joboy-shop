@@ -102,12 +102,15 @@ class DatabaseSeeder extends Seeder
         Setting::set('store_name', 'Boutique WhatsApp Pro');
         Setting::set('store_whatsapp_phone', '33612345678');
         Setting::set('currency_symbol', '€');
-        Setting::set('whatsapp_driver', 'log'); // 'none', 'log', 'whatsapp_cloud_api', 'twilio'
+        Setting::set('whatsapp_driver', 'log'); // 'none', 'log', 'whatsapp_cloud_api', 'twilio', 'infobip'
         Setting::set('whatsapp_cloud_api_token', '');
         Setting::set('whatsapp_cloud_api_phone_number_id', '');
         Setting::set('twilio_account_sid', '');
         Setting::set('twilio_auth_token', '');
         Setting::set('twilio_from_phone', '');
+        Setting::set('infobip_api_key', '');
+        Setting::set('infobip_base_url', '');
+        Setting::set('infobip_from_phone', '');
 
         // 4. Sample Products
         $products = [
