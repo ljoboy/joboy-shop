@@ -113,33 +113,51 @@ inject_env() {
 }
 
 # Attend que la base de données réponde (max ~60s).
+# Retourne 1 si l'hôte est introuvable au niveau DNS.
 wait_for_database() {
     if [ -z "${DB_HOST}" ] || [ -z "${DB_DATABASE}" ]; then
+        echo "!! DB_HOST ou DB_DATABASE non défini : connexion à la base impossible."
         return 0
     fi
 
+    echo ">> Base : ${DB_USERNAME}@${DB_HOST}:${DB_PORT:-3306}/${DB_DATABASE}"
+
+    # 0 = connexion OK, 2 = nom d'hôte non résolu, 1 = pas encore joignable
+    probe='
+$host  = (string) getenv("DB_HOST");
+$port  = (int) (getenv("DB_PORT") ?: 3306);
+$limit = time() + 6;
+do {
+    $fp = @fsockopen($host, $port, $errno, $errstr, 2);
+    if ($fp) { fclose($fp); exit(0); }
+    $resolved = gethostbyname($host);
+    if ($resolved === $host && !filter_var($host, FILTER_VALIDATE_IP)) { exit(2); }
+    usleep(300000);
+} while (time() < $limit);
+exit(1);
+'
+
     tries=0
-    echo ">> Attente de MariaDB sur ${DB_HOST}:${DB_PORT:-3306} ..."
     while [ "${tries}" -lt 60 ]; do
-        if php -r '
-            $host = getenv("DB_HOST");
-            $port = (int) (getenv("DB_PORT") ?: 3306);
-            $tries = 0;
-            while ($tries++ < 3) {
-                $fp = @fsockopen($host, $port, $errno, $errstr, 2);
-                if ($fp) { fclose($fp); exit(0); }
-                usleep(300000);
-            }
-            exit(1);
-        ' 2>/dev/null; then
-            echo ">> MariaDB est disponible."
-            return 0
-        fi
+        rc=0
+        php -r "${probe}" 2>/dev/null || rc=$?
+
+        case "${rc}" in
+            0)
+                echo ">> Base de données disponible."
+                return 0
+                ;;
+            2)
+                echo "!! Hôte '${DB_HOST}' introuvable (DNS)."
+                return 1
+                ;;
+        esac
+
         tries=$((tries + 1))
         sleep 1
     done
 
-    echo "!! MariaDB injoignable après ${tries}s, on continue quand même."
+    echo "!! ${DB_HOST}:${DB_PORT:-3306} injoignable après ${tries}s, on continue quand même."
     return 0
 }
 
@@ -181,13 +199,22 @@ if [ ! -e "${APP_DIR}/public/storage" ]; then
     php artisan storage:link --ansi || true
 fi
 
-wait_for_database
+if ! wait_for_database; then
+    echo "!! Arrêt : l'hôte de base '${DB_HOST}' ne peut pas être résolu."
+    echo "!! Définissez DB_HOST (et DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD)"
+    echo "!! dans les variables d'environnement du conteneur sur Dokploy."
+    exit 1
+fi
 
 php artisan config:clear --ansi >/dev/null 2>&1 || true
 
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo ">> Application des migrations ..."
-    php artisan migrate --force --ansi
+    if ! php artisan migrate --force --ansi; then
+        echo "!! Échec des migrations. Vérifiez DB_CONNECTION, DB_HOST, DB_PORT,"
+        echo "!! DB_DATABASE, DB_USERNAME et DB_PASSWORD du conteneur."
+        exit 1
+    fi
 fi
 
 if [ "${RUN_SEEDERS:-false}" = "true" ]; then
