@@ -1,43 +1,56 @@
-{
-    {$SERVER_NAME:localhost} {
-        root * /app/public
-        index index.php
+# Caddyfile FrankenPHP pour Laravel
+#
+#   SERVER_NAME  : nom de domaine à matcher. Par défaut ":80" afin de répondre
+#                  à n'importe quel Host (utile derrière un reverse proxy type
+#                  Traefik/Dokploy qui conserve le Host d'origine).
+#   Le conteneur écoute sur le port 80 (ENV FRANKENPHP_SERVER_PORT si besoin).
 
-        # Compression
-        encode zstd br gzip
+{$SERVER_NAME::80} {
+    root * /app/public
 
-        # Sécurité
-        header {
-            Strict-Transport-Security "max-age=31536000; includeSubDomains"
-            X-Content-Type-Options "nosniff"
-            X-Frame-Options "SAMEORIGIN"
-            Referrer-Policy "strict-origin-when-cross-origin"
-            -Server
-        }
+    # Compression
+    encode zstd br gzip
 
-        # Assets publics mis en cache longuement
-        @assets path /build/* /storage/* /favicon.ico /robots.txt
-        header @assets Cache-Control "public, max-age=31536000, immutable"
+    # En-têtes de sécurité
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
 
-        # Bloque l'accès aux fichiers sensibles
-        @denied path /.env* /database/* /storage/*.key /.git/*
-        respond @denied 404
+    # Assets versionnés par Vite : cache immuable
+    @assets path /build/* /favicon.ico /robots.txt
+    header @assets Cache-Control "public, max-age=31536000, immutable"
 
-        # Fichiers publics existants servis en statique
-        @existing file
-        handle @existing {
-            file_server
-        }
+    # Fichiers téléversés : cache court (le contenu peut changer)
+    @uploads path /storage/*
+    header @uploads Cache-Control "public, max-age=86400"
 
-        # Tout le reste passe par FrankenPHP
-        handle {
-            frankenphp
-        }
+    # Interdiction d'exposer des fichiers sensibles
+    @denied path /.env* /.git/* /database/* /storage/*.key
+    respond @denied 404
 
-        # Logs
-        log {
-            output stderr
-            format console
-        }
+    # Fichiers publics existants -> servis en statique.
+    # Les URL finissant par "/" (répertoires) sont exclues pour qu'elles
+    # soient traitées par le front controller et non servies par file_server.
+    @static file {
+        try_files {path} =404
+        not path */
+    }
+    handle @static {
+        file_server
+    }
+
+    # Tout le reste -> index.php (routes Laravel)
+    handle {
+        rewrite * /index.php
+        frankenphp
+    }
+
+    log {
+        output stderr
+        format console
     }
 }

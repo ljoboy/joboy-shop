@@ -14,26 +14,58 @@ ENV_EXAMPLE="${ENV_EXAMPLE:-${APP_DIR}/.env.example}"
 
 cd "${APP_DIR}"
 
+# Vrai si le .env peut être écrit (système de fichiers en lecture seule ->
+# les variables d'environnement réelles du conteneur sont alors utilisées,
+# elles ont de toute façon priorité sur le .env avec le Dotenv immuable).
+ENV_WRITABLE=true
+
+can_write_env() {
+    if [ "${ENV_WRITABLE}" != "true" ]; then
+        return 1
+    fi
+
+    if [ -w "${ENV_FILE}" ] 2>/dev/null; then
+        return 0
+    fi
+
+    ENV_WRITABLE=false
+    echo ">> ${ENV_FILE} non inscriptible : variables d'environnement utilisées telles quelles."
+    return 1
+}
+
+# Échappe les caractères spéciaux de la substitution sed (\, & et le délimiteur |).
+sed_escape() {
+    printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
+}
+
 # Remplace (ou ajoute) une clé dans le fichier .env sans eval par le shell.
 set_env() {
     key="$1"
     value="$2"
 
     [ -n "${value}" ] || return 0
+    can_write_env || return 0
+
+    escaped=$(sed_escape "${value}")
 
     if grep -q "^${key}=" "${ENV_FILE}" 2>/dev/null; then
         # BSD/GNU sed compatible
-        sed -i.bak "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}" && rm -f "${ENV_FILE}.bak"
+        sed -i.bak "s|^${key}=.*|${key}=${escaped}|" "${ENV_FILE}" && rm -f "${ENV_FILE}.bak"
     else
-        printf '%s=%s\n' "${key}" "${value}" >> "${ENV_FILE}"
+        printf '%s=%s\n' "${key}" "${escaped}" >> "${ENV_FILE}"
     fi
 }
 
 # Crée le .env à partir du .env.example s'il n'existe pas encore.
 ensure_env_file() {
     if [ ! -f "${ENV_FILE}" ]; then
-        echo ">> Création de ${ENV_FILE} depuis $(basename "${ENV_EXAMPLE}")"
-        cp "${ENV_EXAMPLE}" "${ENV_FILE}"
+        if [ -r "${ENV_EXAMPLE}" ] && touch "${ENV_FILE}" 2>/dev/null; then
+            echo ">> Création de ${ENV_FILE} depuis $(basename "${ENV_EXAMPLE}")"
+            cp "${ENV_EXAMPLE}" "${ENV_FILE}"
+        else
+            ENV_WRITABLE=false
+            echo ">> Impossible de créer ${ENV_FILE} : variables d'environnement utilisées telles quelles."
+        fi
     fi
 }
 
@@ -107,9 +139,19 @@ fi
 ensure_env_file
 inject_env
 
-if [ -z "${APP_KEY}" ] || ! grep -q '^APP_KEY=base64:' "${ENV_FILE}" 2>/dev/null; then
-    echo ">> Génération de APP_KEY"
-    php artisan key:generate --force --ansi
+if [ "${ENV_WRITABLE}" = "true" ]; then
+    if [ -z "${APP_KEY}" ] || ! grep -q '^APP_KEY=base64:' "${ENV_FILE}" 2>/dev/null; then
+        if [ -n "${APP_KEY}" ]; then
+            echo ">> Injection de APP_KEY depuis l'environnement"
+            set_env APP_KEY "${APP_KEY}"
+        else
+            echo ">> Génération de APP_KEY"
+            php artisan key:generate --force --ansi
+        fi
+    fi
+elif [ -z "${APP_KEY}" ]; then
+    echo "!! Aucune APP_KEY : sessions et cookies chiffrés ne fonctionneront pas."
+    echo "!! Définissez APP_KEY (base64:...) dans l'environnement du conteneur."
 fi
 
 mkdir -p \
@@ -117,9 +159,12 @@ mkdir -p \
     storage/framework/sessions \
     storage/framework/views \
     storage/logs \
-    bootstrap/cache
+    bootstrap/cache \
+    || echo "!! Répertoires storage/bootstrap/cache non inscriptibles."
 
-[ -e "${APP_DIR}/public/storage" ] || php artisan storage:link --ansi
+if [ ! -e "${APP_DIR}/public/storage" ]; then
+    php artisan storage:link --ansi || true
+fi
 
 wait_for_database
 
@@ -136,11 +181,15 @@ if [ "${RUN_SEEDERS:-false}" = "true" ]; then
 fi
 
 if [ "${APP_ENV}" = "production" ] || [ "${RUN_OPTIMIZE:-true}" = "true" ]; then
-    echo ">> Optimisation des caches Laravel ..."
-    php artisan config:cache --ansi
-    php artisan route:cache --ansi
-    php artisan view:cache --ansi
-    php artisan event:cache --ansi
+    if [ -w "${APP_DIR}/bootstrap/cache" ] 2>/dev/null; then
+        echo ">> Optimisation des caches Laravel ..."
+        php artisan config:cache --ansi
+        php artisan route:cache --ansi
+        php artisan view:cache --ansi
+        php artisan event:cache --ansi
+    else
+        echo ">> bootstrap/cache non inscriptible : caches Laravel non précompilés."
+    fi
 fi
 
 exec "$@"
