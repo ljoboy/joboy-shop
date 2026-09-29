@@ -38,6 +38,21 @@ sed_escape() {
     printf '%s' "$1" | sed -e 's/[\\&|]/\\&/g'
 }
 
+# Encode une valeur pour un fichier .env lu par phpdotenv.
+# Une valeur nue est acceptée uniquement si elle ne contient aucun caractère
+# spécial ; sinon elle est entourée de guillemets doubles, car
+# "APP_NAME=Joboy Shop" est invalide ("unexpected whitespace").
+env_quote() {
+    value="$1"
+
+    if printf '%s' "${value}" | grep -q '^[A-Za-z0-9_./:@%+-]\{1,\}$'; then
+        printf '%s' "${value}"
+        return 0
+    fi
+
+    printf '"%s"' "$(printf '%s' "${value}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
+}
+
 # Remplace (ou ajoute) une clé dans le fichier .env sans eval par le shell.
 set_env() {
     key="$1"
@@ -46,7 +61,7 @@ set_env() {
     [ -n "${value}" ] || return 0
     can_write_env || return 0
 
-    escaped=$(sed_escape "${value}")
+    escaped=$(sed_escape "$(env_quote "${value}")")
 
     if grep -q "^${key}=" "${ENV_FILE}" 2>/dev/null; then
         # BSD/GNU sed compatible
