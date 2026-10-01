@@ -24,12 +24,8 @@ services:
             LOG_LEVEL: ${DOCKER_LOG_LEVEL:-info}
             LOG_STACK: ${DOCKER_LOG_STACK:-stderr}
 
-            DB_CONNECTION: mariadb
-            DB_HOST: mariadb
-            DB_PORT: 3306
-            DB_DATABASE: ${DOCKER_DB_DATABASE:-joboy_shop}
-            DB_USERNAME: ${DOCKER_DB_USERNAME:-joboy}
-            DB_PASSWORD: ${DOCKER_DB_PASSWORD:-secret}
+            DB_CONNECTION: sqlite
+            DB_DATABASE: ${DOCKER_DB_DATABASE:-/app/database/database.sqlite}
 
             CACHE_STORE: ${DOCKER_CACHE_STORE:-database}
             SESSION_DRIVER: ${DOCKER_SESSION_DRIVER:-database}
@@ -40,9 +36,7 @@ services:
             RUN_SEEDERS: ${DOCKER_RUN_SEEDERS:-false}
         volumes:
             - app-storage:/app/storage
-        depends_on:
-            mariadb:
-                condition: service_healthy
+            - app-database:/app/database
         healthcheck:
             test: ['CMD', 'php', '-r', "exit(@fsockopen('127.0.0.1', 80) ? 0 : 1);"]
             interval: 30s
@@ -50,28 +44,6 @@ services:
             retries: 3
             start_period: 40s
 
-    mariadb:
-        image: mariadb:11.4
-        restart: unless-stopped
-        command:
-            - --character-set-server=utf8mb4
-            - --collation-server=utf8mb4_unicode_ci
-        environment:
-            MARIADB_ROOT_PASSWORD: ${DOCKER_DB_ROOT_PASSWORD:-root}
-            MARIADB_DATABASE: ${DOCKER_DB_DATABASE:-joboy_shop}
-            MARIADB_USER: ${DOCKER_DB_USERNAME:-joboy}
-            MARIADB_PASSWORD: ${DOCKER_DB_PASSWORD:-secret}
-        volumes:
-            - mariadb-data:/var/lib/mysql
-        healthcheck:
-            test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
-            interval: 10s
-            timeout: 5s
-            retries: 12
-            start_period: 30s
-        ports:
-            - '${DOCKER_DB_PORT_FORWARD:-3307}:3306'
-
 volumes:
     app-storage:
-    mariadb-data:
+    app-database:

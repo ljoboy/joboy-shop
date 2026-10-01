@@ -94,11 +94,8 @@ ARG APP_NAME="Joboy Shop"
 ARG APP_ENV=production
 ARG APP_DEBUG=false
 ARG APP_URL=http://localhost
-ARG DB_CONNECTION=mariadb
-ARG DB_HOST=mariadb
-ARG DB_PORT=3306
-ARG DB_DATABASE=joboy_shop
-ARG DB_USERNAME=joboy
+ARG DB_CONNECTION=sqlite
+ARG DB_DATABASE=/app/database/database.sqlite
 
 RUN cp .env.example .env \
     && APP_NAME="${APP_NAME}" \
@@ -106,16 +103,14 @@ RUN cp .env.example .env \
        APP_DEBUG="${APP_DEBUG}" \
        APP_URL="${APP_URL}" \
        DB_CONNECTION="${DB_CONNECTION}" \
-       DB_HOST="${DB_HOST}" \
-       DB_PORT="${DB_PORT}" \
        DB_DATABASE="${DB_DATABASE}" \
-       DB_USERNAME="${DB_USERNAME}" \
        /usr/local/bin/app-entrypoint env:build
 
 RUN composer dump-autoload --classmap-authoritative --no-dev --no-interaction \
     && php artisan package:discover --ansi \
-    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+    && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache database \
+    && touch database/database.sqlite \
+    && chown -R www-data:www-data storage bootstrap/cache database
 
 EXPOSE 80
 

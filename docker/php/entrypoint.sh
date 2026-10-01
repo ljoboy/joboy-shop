@@ -3,7 +3,7 @@
 #
 #   app-entrypoint env:build  -> injecte les variables d'environnement dans .env
 #                               (utilisé pendant le build de l'image)
-#   app-entrypoint [cmd...]  -> injecte .env, attend MariaDB, migre, puis
+#   app-entrypoint [cmd...]  -> injecte .env, prépare SQLite, migre, puis
 #                               exécute la commande (par défaut FrankenPHP)
 
 set -e
@@ -91,11 +91,12 @@ inject_env() {
     set_env APP_DEBUG "${APP_DEBUG}"
     set_env APP_URL "${APP_URL}"
 
-    if [ -n "${DB_CONNECTION}" ]; then
-        set_env DB_CONNECTION "${DB_CONNECTION}"
+    set_env DB_CONNECTION "${DB_CONNECTION}"
+    set_env DB_DATABASE "${DB_DATABASE}"
+
+    if [ "${DB_CONNECTION}" != "sqlite" ]; then
         set_env DB_HOST "${DB_HOST}"
         set_env DB_PORT "${DB_PORT}"
-        set_env DB_DATABASE "${DB_DATABASE}"
         set_env DB_USERNAME "${DB_USERNAME}"
         set_env DB_PASSWORD "${DB_PASSWORD}"
         set_env DB_CHARSET "${DB_CHARSET:-utf8mb4}"
@@ -110,6 +111,31 @@ inject_env() {
     set_env LOG_STACK "${LOG_STACK:-stderr}"
     set_env MAIL_MAILER "${MAIL_MAILER:-log}"
     set_env FILESYSTEM_DISK "${FILESYSTEM_DISK:-local}"
+}
+
+# Crée le fichier SQLite et son répertoire parent si nécessaire.
+# Retourne 1 si le chemin n'est pas inscriptible.
+ensure_sqlite_database() {
+    db_path="${DB_DATABASE:-${APP_DIR}/database/database.sqlite}"
+
+    db_dir=$(dirname "${db_path}")
+
+    if [ ! -d "${db_dir}" ]; then
+        mkdir -p "${db_dir}" 2>/dev/null || true
+    fi
+
+    if [ ! -f "${db_path}" ]; then
+        touch "${db_path}" 2>/dev/null || true
+    fi
+
+    if [ ! -f "${db_path}" ] || [ ! -w "${db_path}" ]; then
+        echo "!! Fichier SQLite '${db_path}' absent ou non inscriptible."
+        echo "!! Vérifiez que le volume monté sur ${db_dir} est accessible."
+        return 1
+    fi
+
+    echo ">> Base SQLite prête : ${db_path}"
+    return 0
 }
 
 # Attend que la base de données réponde (max ~60s).
@@ -199,11 +225,17 @@ if [ ! -e "${APP_DIR}/public/storage" ]; then
     php artisan storage:link --ansi || true
 fi
 
-if ! wait_for_database; then
-    echo "!! Arrêt : l'hôte de base '${DB_HOST}' ne peut pas être résolu."
-    echo "!! Définissez DB_HOST (et DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD)"
-    echo "!! dans les variables d'environnement du conteneur sur Dokploy."
-    exit 1
+if [ "${DB_CONNECTION:-sqlite}" = "sqlite" ]; then
+    if ! ensure_sqlite_database; then
+        exit 1
+    fi
+else
+    if ! wait_for_database; then
+        echo "!! Arrêt : l'hôte de base '${DB_HOST}' ne peut pas être résolu."
+        echo "!! Définissez DB_HOST (et DB_PORT/DB_DATABASE/DB_USERNAME/DB_PASSWORD)"
+        echo "!! dans les variables d'environnement du conteneur sur Dokploy."
+        exit 1
+    fi
 fi
 
 php artisan config:clear --ansi >/dev/null 2>&1 || true
