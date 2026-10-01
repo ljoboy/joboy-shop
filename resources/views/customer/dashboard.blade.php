@@ -81,7 +81,7 @@
                         Découvrir la boutique
                     </a>
                 </div>
-            @forelse
+            @endforelse
         </div>
     </div>
 </div>

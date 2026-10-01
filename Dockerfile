@@ -110,7 +110,9 @@ RUN composer dump-autoload --classmap-authoritative --no-dev --no-interaction \
     && php artisan package:discover --ansi \
     && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache database \
     && touch database/database.sqlite \
-    && chown -R www-data:www-data storage bootstrap/cache database
+    && ln -sfn /app/storage/app/public public/storage \
+    && chown -R www-data:www-data storage bootstrap/cache database \
+    && chown www-data:www-data .env
 
 EXPOSE 80
 
