@@ -11,6 +11,7 @@ set -e
 APP_DIR="${APP_DIR:-/app}"
 ENV_FILE="${ENV_FILE:-${APP_DIR}/.env}"
 ENV_EXAMPLE="${ENV_EXAMPLE:-${APP_DIR}/.env.example}"
+ENV_TMP_DIR="${ENV_TMP_DIR:-/tmp}"
 
 cd "${APP_DIR}"
 
@@ -42,18 +43,24 @@ sed_escape() {
 # Une valeur nue est acceptée uniquement si elle ne contient aucun caractère
 # spécial ; sinon elle est entourée de guillemets doubles, car
 # "APP_NAME=Joboy Shop" est invalide ("unexpected whitespace").
+# "=" est toléré pour les valeurs base64 (APP_KEY), le premier "=" servant
+# déjà de séparateur.
 env_quote() {
     value="$1"
 
-    if printf '%s' "${value}" | grep -q '^[A-Za-z0-9_./:@%+-]\{1,\}$'; then
+    if printf '%s' "${value}" | grep -q '^[A-Za-z0-9_./:@%+=!-]\{1,\}$'; then
         printf '%s' "${value}"
         return 0
     fi
-
     printf '"%s"' "$(printf '%s' "${value}" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 }
 
 # Remplace (ou ajoute) une clé dans le fichier .env sans eval par le shell.
+#
+# Le temporaire est créé dans ENV_TMP_DIR et non à côté de ENV_FILE : le
+# répertoire /app appartient à root alors que le conteneur tourne en www-data,
+# et "sed -i" échoue ("Permission denied" sur /app/sedXXXX) dès lors que le
+# fichier .env est inscriptible mais pas son dossier parent.
 set_env() {
     key="$1"
     value="$2"
@@ -62,13 +69,24 @@ set_env() {
     can_write_env || return 0
 
     escaped=$(sed_escape "$(env_quote "${value}")")
+    tmp="${ENV_TMP_DIR}/app-env.$$"
 
     if grep -q "^${key}=" "${ENV_FILE}" 2>/dev/null; then
-        # BSD/GNU sed compatible
-        sed -i.bak "s|^${key}=.*|${key}=${escaped}|" "${ENV_FILE}" && rm -f "${ENV_FILE}.bak"
+        sed "s|^${key}=.*|${key}=${escaped}|" "${ENV_FILE}" > "${tmp}" || return 0
     else
-        printf '%s=%s\n' "${key}" "${escaped}" >> "${ENV_FILE}"
+        cp "${ENV_FILE}" "${tmp}" || return 0
+        printf '%s=%s\n' "${key}" "${escaped}" >> "${tmp}"
     fi
+
+    # "cat >" tronque puis réécrit le fichier cible : seules les permissions du
+    # fichier lui-même sont requises, pas celles de son répertoire.
+    if ! cat "${tmp}" > "${ENV_FILE}"; then
+        echo "!! Écriture de ${ENV_FILE} impossible (permissions ?)."
+        rm -f "${tmp}"
+        return 0
+    fi
+
+    rm -f "${tmp}"
 }
 
 # Crée le .env à partir du .env.example s'il n'existe pas encore.
